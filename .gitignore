@@ -1,0 +1,85 @@
+# See http://help.github.com/ignore-files/ for more about ignoring files.
+
+# compiled output
+/dist
+/tmp
+app/output
+app/updated
+/out-tsc
+# Only exists if Bazel was run
+/bazel-out
+
+# dependencies
+/node_modules
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+.pnpm-store/
+.npm-cache
+.angular/
+
+# Python
+.venv/
+.uv-cache/
+venv/
+env/
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# 运行时日志（loguru 按配置写入 logs/app.log 及轮转文件）
+logs/
+*.log
+
+# 测试与静态检查产物
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# 本地工作记忆（非项目内容，勿上传）
+.workbuddy/
+
+# profiling files
+chrome-profiler-events*.json
+speed-measure-plugin*.json
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.history/*
+
+# misc
+/.angular/cache
+/.sass-cache
+/connect.lock
+/coverage
+/libpeerconnection.log
+npm-debug.log
+yarn-error.log
+testem.log
+/typings
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# ===== 运行时产物（Docker 挂载目录，容器重建可再生成）=====
+docker/runtime/

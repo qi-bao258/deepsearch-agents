@@ -1,0 +1,19 @@
+# 前端镜像构建上下文排除项
+# 缺了这个文件，构建上下文会把 node_modules 整个打进 daemon，构建显著变慢
+
+node_modules/
+dist/
+.vite/
+
+# 本地环境变量：容器内用 .env.local 会覆盖同源相对路径配置，必须排除
+.env.local
+
+# 编辑器与版本控制
+.vscode/
+.idea/
+.git/
+.gitignore
+
+*.log
+npm-debug.log*
+pnpm-debug.log*

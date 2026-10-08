@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Install dependencies
+        # dev 组含 pytest / pytest-asyncio / ruff，测试必需
+        run: uv sync --frozen
+
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
+      - name: Format check (ruff)
+        run: uv run ruff format --check .
+
+      - name: Run tests
+        # 测试全部使用 mock / TestClient，不依赖 MySQL、LLM 与 Tavily 等外部服务。
+        # 因此 CI 无需注入任何密钥即可完整跑通——这也是测试设计的约束：
+        # 一旦某个测试开始依赖真实外部服务，它就不该留在单元测试里。
+        run: uv run pytest -q
+
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        # 只验证镜像可构建，不推送，用于拦截 Dockerfile 破坏性变更
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

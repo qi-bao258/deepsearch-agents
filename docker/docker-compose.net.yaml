@@ -1,0 +1,18 @@
+# 基础设施接入共享网络
+#
+# docker-compose.yaml 里的 mysql 未声明 networks，默认落在自己的项目网络
+# deepsearch-agents_default 里。应用容器由另一个 compose 项目启动，虽然这里
+# 也用同一网络名，但为了语义明确、避免后续新增服务时遗漏，统一用 override
+# 把基础设施挂到共享网络 deepsearch-net。
+#
+# 与 docker-compose.app.yaml 配套使用：
+#   docker compose -f docker-compose.yaml -f docker-compose.net.yaml -f docker-compose.app.yaml up -d
+
+services:
+  mysql:
+    networks: [deepsearch-net]
+
+networks:
+  deepsearch-net:
+    name: deepsearch-net
+    external: false

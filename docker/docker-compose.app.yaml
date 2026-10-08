@@ -1,0 +1,82 @@
+# 应用编排（后端 + 前端）
+#
+# 与 docker-compose.yaml 分开管理：
+#   docker-compose.yaml      基础设施（MySQL）—— 变更少，数据卷在此
+#   docker-compose.net.yaml  让基础设施接入共享网络
+#   docker-compose.app.yaml  应用（backend / frontend）—— 改代码后重建这一个
+#
+# 三者共用同一网络（deepsearch-net），容器内可直接用服务名互访。
+#
+# 用法（在 docker 目录下执行，显式指定 env 文件）：
+#   docker compose --env-file ../.env \
+#     -f docker-compose.yaml -f docker-compose.net.yaml -f docker-compose.app.yaml up -d
+#
+# 为什么把应用也容器化：
+#   本机沙箱会在终端会话结束时回收其派生的进程树，导致在宿主机直接
+#   uvicorn / vite 起的服务无法长期存活（表现为前端连接被拒）。
+#   放进容器后由 Docker daemon 托管，不受会话生命周期影响。
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: deepsearch-agents-backend:local
+    container_name: deepsearch-backend
+    restart: unless-stopped
+    environment:
+      # LLM 配置从宿主机 .env 注入，容器内不落盘
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:?请在项目根 .env 设置 OPENAI_BASE_URL}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?请在项目根 .env 设置 OPENAI_API_KEY}
+      LLM_QWEN_MAX: ${LLM_QWEN_MAX:?请在项目根 .env 设置 LLM_QWEN_MAX}
+      # Tavily / RAGFlow 为可选依赖，允许为空
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      RAGFLOW_API_URL: ${RAGFLOW_API_URL:-}
+      RAGFLOW_API_KEY: ${RAGFLOW_API_KEY:-}
+
+      # ---- 关键：容器内 host 语义与宿主机不同 ----
+      # 宿主机 .env 里 MYSQL_HOST=localhost、MYSQL_PORT=3308（映射到本机 3308）。
+      # 容器内 localhost 指向容器自身，且 3308 是宿主映射端口，
+      # 必须改成服务名 mysql + 容器内真实端口 3306。
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_USER: ${MYSQL_USER:-root}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-deepsearch_db}
+      MYSQL_CHARSET: ${MYSQL_CHARSET:-utf8mb4}
+      MYSQL_COLLATION: ${MYSQL_COLLATION:-utf8mb4_unicode_ci}
+      MYSQL_SQL_MODE: ${MYSQL_SQL_MODE:-TRADITIONAL}
+      TZ: Asia/Shanghai
+    volumes:
+      # 会话产物 / 上传文件 / 日志持久化到宿主机，容器重建不丢数据
+      - ./runtime/output:/app/app/output
+      - ./runtime/updated:/app/app/updated
+      - ./runtime/logs:/app/logs
+    ports:
+      # 仅在需要直连后端调试接口时使用；正常访问走前端 Nginx 反代
+      - "8001:8001"
+    networks:
+      - deepsearch-net
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    image: deepsearch-agents-frontend:local
+    container_name: deepsearch-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      # 宿主 5173 → 容器 80（Nginx）。保持与开发态一致的访问地址
+      - "5173:80"
+    networks:
+      - deepsearch-net
+
+networks:
+  deepsearch-net:
+    name: deepsearch-net
+    external: false

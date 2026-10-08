@@ -1,0 +1,90 @@
+[project]
+name = "deepsearch-agents"
+version = "0.1.0"
+description = "DeepAgents learning examples for deep research agents."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "aiofiles>=23.0.0",
+    "deepagents==0.5.7",
+    "fastapi>=0.100.0",
+    "langchain==1.2.17",
+    "langchain-community>=0.2.0",
+    "langchain-core>=0.2.0",
+    "langchain-openai==1.2.1",
+    "langgraph==1.1.10",
+    "loguru>=0.7.0",
+    "markdown>=3.5",
+    "mysql-connector-python>=8.0.0",
+    "openai>=1.0.0",
+    "openpyxl>=3.1.0",
+    "pandas>=2.0.0",
+    "pydantic>=2.0.0",
+    "pypdf>=3.0.0",
+    "python-docx>=1.0.0",
+    "python-dotenv==1.2.2",
+    "python-multipart>=0.0.6",
+    "pyyaml>=6.0",
+    "ragflow-sdk>=0.1.0",
+    "reportlab>=4.0.0",
+    "requests>=2.31.0",
+    "tavily-python==0.7.24",
+    "typing-extensions>=4.5.0",
+    "uvicorn[standard]>=0.20.0",
+]
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+# 开发与测试依赖与运行依赖隔离：
+# 镜像构建只装 dependencies，避免把 pytest/ruff 带进生产镜像。
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=5.0.0",
+    "ruff>=0.6.0",
+]
+
+[tool.pytest.ini_options]
+# asyncio_mode = "auto" 让异步用例无需逐个标注 @pytest.mark.asyncio，
+# 否则新增异步测试很容易因漏标而"静默通过"（pytest 会跳过未标记的协程）。
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/output/*", "tests/*"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+extend-exclude = [
+    "*.md",
+    "frontend",
+    "app/output",
+    "app/updated",
+    # 项目根目录下的 `数字-xxx.py` 是配套教程的独立演示脚本，
+    # 以"脚本可整段复制运行"为目标，行长不遵循 88 字符约束。
+    # 把它们排除在 lint 之外，而不是为了让 lint 通过去改教学代码。
+    "[0-9]-*.py",
+    "[0-9][0-9]-*.py",
+]
+
+[tool.ruff.lint]
+# 与项目既有 .pre-commit-config.yaml 的检查范围保持一致（ruff 默认规则）。
+# 刻意不开启 UP 规则集：把 Optional[str] 全量改成 str | None 属于风格迁移，
+# 会与现有代码风格大面积冲突，不适合作为本次工程化改造的附带改动。
+select = ["E", "F", "I", "W", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# B008 对 FastAPI 是误报：`files: List[UploadFile] = File(...)` 是该框架
+# 声明的标准依赖注入写法，不是"函数调用作为默认值"的设计问题。
+"app/api/server.py" = ["B008"]
+
+# 以下文件存在若干 E501（行长）问题，属本次工程化改造之前的遗留，
+# 与本次新增的日志/护栏/健康检查等改动无关。
+# 这里显式忽略而不是直接删除规则，是为了保留可见性：清理完成后应移除本段。
+# 待办：将这些文件按 88 字符重排后，删除下面这几行。
+"app/tools/ragflow_tools.py" = ["E501"]
+"app/tools/tavily_tool.py" = ["E501"]
+"app/utils/word_converter.py" = ["E501"]
