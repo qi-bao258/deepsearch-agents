@@ -93,7 +93,7 @@ cp .env.example .env   # 编辑 .env，设置 OPENAI_API_KEY、LLM_QWEN_MAX、TA
 3. 双击 `启动深度研搜.ps1`，脚本会自动拉起 Docker 引擎、启动全部容器、等待后端就绪并打开浏览器：
 
 ```text
-前端界面：http://localhost:5173
+前端界面：http://localhost:5174
 接口文档：http://localhost:8001/docs
 健康检查：http://localhost:8001/health/ready
 ```

@@ -79,6 +79,11 @@ updated_dir.mkdir(exist_ok=True)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        # 容器模式：前端由 Nginx 托管，映射到宿主 5174
+        # （固定 5174 以避开同机电商问数项目占用的 5173）
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+        # 开发模式：vite dev server 默认 5173（见 frontend/vite.config.ts）
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ],

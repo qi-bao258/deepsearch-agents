@@ -1,0 +1,233 @@
+# 深度研搜 · 安全护栏回归评测集（Golden Set）
+#
+# 与电商问数的评测集不同：本项目评测的对象不是"检索召回质量"
+# （那需要 Qdrant / ES 等外部服务，无法离线跑），而是**安全护栏与路径
+# 解析的确定性行为**。这类行为是纯函数，不依赖网络与模型，因此可以在
+# CI 中每次提交都跑，成本近乎为零。
+#
+# 评测的意义：把"护栏到底拦住了什么"从注释里的承诺，变成可回归的基线。
+# 任何人改动了 guard_sql / guard_identifier / resolve_path，只要改变了
+# 既有判定，这个评测集会立刻失败——这正是安全代码最需要的回归保护。
+#
+# 三类用例：
+#   sql        —— guard_sql 对整条 SQL 的放行 / 拒绝
+#   identifier —— guard_identifier 对表名 / 字段名的放行 / 拒绝
+#   path       —— resolve_path 对文件路径的放行 / 拒绝
+#
+# 公共字段：
+#   id        用例编号
+#   kind      用例类型（sql / identifier / path）
+#   input     输入（字符串；也可写成 {repeat: {char, times}} 表达长度边界）
+#   expect    期望判定：allow（应放行）/ deny（应拒绝）
+#   category  场景分类，便于报告分组阅读
+#   expect_limit_injected  （仅 sql）期望的 LIMIT 是否被自动补齐/收紧
+
+# --------------------------------------------------------------------------
+# 一、SQL 整句护栏
+# --------------------------------------------------------------------------
+- id: s001
+  kind: sql
+  input: SELECT * FROM orders
+  expect: allow
+  expect_limit_injected: true
+  category: 普通查询应放行并补齐 LIMIT
+
+- id: s002
+  kind: sql
+  input: SELECT id, name FROM users WHERE status = 'active'
+  expect: allow
+  category: 带等值过滤的查询
+
+- id: s003
+  kind: sql
+  input: SELECT * FROM users WHERE name = 'delete'
+  expect: allow
+  category: 字符串字面量含关键字不应误杀
+
+- id: s004
+  kind: sql
+  input: SELECT * FROM users LIMIT 50
+  expect: allow
+  expect_limit_injected: false
+  category: 已有合法 LIMIT 不重复注入
+
+- id: s005
+  kind: sql
+  input: SELECT * FROM users LIMIT 99999
+  expect: allow
+  expect_limit_injected: true
+  category: 超界 LIMIT 应被收紧
+
+- id: s006
+  kind: sql
+  input: WITH recent AS (SELECT id FROM orders) SELECT * FROM recent
+  expect: allow
+  category: CTE（WITH）属于只读查询
+
+- id: s007
+  kind: sql
+  input: SELECT update_time FROM users
+  expect: allow
+  category: 字段名含关键字子串不应误判（词边界）
+
+- id: s008
+  kind: sql
+  input: DROP TABLE users
+  expect: deny
+  category: 非查询语句一律拒绝
+
+- id: s009
+  kind: sql
+  input: SELECT 1; DROP TABLE users
+  expect: deny
+  category: 多语句拼接应拦截
+
+- id: s010
+  kind: sql
+  input: UPDATE users SET name = 'x'
+  expect: deny
+  category: 写操作拒绝
+
+- id: s011
+  kind: sql
+  input: INSERT INTO users VALUES (1)
+  expect: deny
+  category: 写操作拒绝
+
+- id: s012
+  kind: sql
+  input: DELETE FROM users
+  expect: deny
+  category: 写操作拒绝
+
+- id: s013
+  kind: sql
+  input: SELECT * FROM users FOR UPDATE
+  expect: deny
+  category: 悲观锁子句应拒绝
+
+- id: s014
+  kind: sql
+  input: ""
+  expect: deny
+  category: 空语句拒绝
+
+# --------------------------------------------------------------------------
+# 二、标识符护栏
+# --------------------------------------------------------------------------
+- id: i001
+  kind: identifier
+  input: orders
+  expect: allow
+  category: 普通表名
+
+- id: i002
+  kind: identifier
+  input: orders_2024
+  expect: allow
+  category: 含数字与下划线
+
+- id: i003
+  kind: identifier
+  input: _tmp
+  expect: allow
+  category: 下划线开头
+
+- id: i004
+  kind: identifier
+  input:
+    repeat: {char: a, times: 64}
+  expect: allow
+  category: 长度边界（64 字符，恰好合法）
+
+- id: i005
+  kind: identifier
+  input:
+    repeat: {char: a, times: 65}
+  expect: deny
+  category: 长度边界（65 字符，超限）
+
+- id: i006
+  kind: identifier
+  input: orders; DROP TABLE users
+  expect: deny
+  category: 注入拼接拒绝
+
+- id: i007
+  kind: identifier
+  input: 订单表
+  expect: deny
+  category: 非 ASCII 标识符拒绝
+
+- id: i008
+  kind: identifier
+  input: ""
+  expect: deny
+  category: 空标识符拒绝
+
+- id: i009
+  kind: identifier
+  input: table-name
+  expect: deny
+  category: 含连字符拒绝
+
+- id: i010
+  kind: identifier
+  input: "1table"
+  expect: deny
+  category: 数字开头拒绝
+
+# --------------------------------------------------------------------------
+# 三、路径解析护栏
+#
+# 说明：这里只收录「Windows 与 POSIX 语义一致」的用例。
+# `/xxx`（无盘符）与 `C:/xxx`（带盘符）在不同平台下的解析语义不同，
+# 不宜作为跨平台 CI 的基线断言，故不纳入本评测集（其单测已覆盖）。
+# --------------------------------------------------------------------------
+- id: p001
+  kind: path
+  input: report.md
+  expect: allow
+  category: 会话目录内的普通文件名
+
+- id: p002
+  kind: path
+  input: sub/dir/report.md
+  expect: allow
+  category: 会话目录内的嵌套相对路径
+
+- id: p003
+  kind: path
+  input: output/session_x/note.md
+  expect: allow
+  category: output/ 前缀应归类到会话目录
+
+- id: p004
+  kind: path
+  input: ../outside.txt
+  expect: deny
+  category: 相对路径越界应拒绝
+
+- id: p005
+  kind: path
+  input: ../../../../etc/passwd
+  expect: deny
+  category: 深层相对穿越应拒绝
+
+- id: p006
+  kind: path
+  input: updated/attachments/a.pdf
+  expect: allow
+  category: 上传目录应放行
+
+- id: p007
+  kind: path
+  input: updated/../app/config.py
+  expect: deny
+  category: 借上传目录回溯到源码应拒绝
+
+- id: p008
+  kind: path
+  input: ""
+  expect: deny
+  category: 空路径拒绝

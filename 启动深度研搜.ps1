@@ -28,7 +28,7 @@ $ComposeFiles = @(
     '-f', 'docker-compose.app.yaml'
 )
 
-$FrontendUrl = 'http://localhost:5173'
+$FrontendUrl = 'http://localhost:5174'
 $ReadyUrl    = 'http://127.0.0.1:8001/health/ready'
 $DocsUrl     = 'http://127.0.0.1:8001/docs'
 

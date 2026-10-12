@@ -57,13 +57,13 @@ export async function uploadSessionFiles(
 }
 
 export async function listSessionFiles(path: string): Promise<FileListResponse> {
-  const url = new URL(apiUrl("/api/files"));
+  const url = new URL(apiUrl("/api/files"), window.location.origin);
   url.searchParams.set("path", path);
   return requestJson<FileListResponse>(url);
 }
 
 export function getDownloadUrl(path: string): string {
-  const url = new URL(apiUrl("/api/download"));
+  const url = new URL(apiUrl("/api/download"), window.location.origin);
   url.searchParams.set("path", path);
   return url.toString();
 }

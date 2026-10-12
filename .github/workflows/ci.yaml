@@ -38,6 +38,30 @@ jobs:
         # 一旦某个测试开始依赖真实外部服务，它就不该留在单元测试里。
         run: uv run pytest -q
 
+  eval-gate:
+    name: Eval Gate
+    runs-on: ubuntu-latest
+    # 安全护栏回归与单测分离成独立 job：
+    # 单测挂说明代码坏了；护栏评测挂说明既有安全判定被改变了——两类问题分开定位。
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Run offline eval
+        # 评测集为纯函数护栏用例，不需要任何外部服务或密钥即可跑通。
+        # 脚本内部以非零退出码表示未达通过率阈值，天然可作为 CI 门禁。
+        run: uv run python -m eval.run_eval
+
   docker-build:
     name: Docker Build
     runs-on: ubuntu-latest
